@@ -1,63 +1,49 @@
-[![Windows Status](http://img.shields.io/appveyor/ci/MSOpenTech-lab/redis.svg?style=flat-square)](https://ci.appveyor.com/project/MSOpenTech-lab/redis) [![NuGet version](http://img.shields.io/nuget/v/redis-64.svg?style=flat-square)](http://www.nuget.org/packages/redis-64/) [![Chocolatey version](http://img.shields.io/chocolatey/v/redis-64.svg?style=flat-square)](http://www.chocolatey.org/packages/redis-64/) [![Chocolatey downloads](http://img.shields.io/chocolatey/dt/redis-64.svg?style=flat-square)](http://www.chocolatey.org/packages/redis-64/)
+#Redis
+--------
 
-## Redis on Windows 
+Darbas atliktas naudojant Java Spring
 
-- This is a port for Windows based on [Redis](https://github.com/antirez/redis).
-- We officially support the 64-bit version only. Although you can build the 32-bit version from source if desired.
-- You can download the latest unsigned binaries and the unsigned MSI installer from the [release page](http://github.com/MSOpenTech/redis/releases "Release page").
-- For releases prior to 2.8.17.1, the binaries can found in a zip file inside the source archive, under the bin/release folder.
-- Signed binaries are available through [NuGet](https://www.nuget.org/packages/Redis-64/) and [Chocolatey](https://chocolatey.org/packages/redis-64).
-- Redis can be installed as a Windows Service.
+-------
 
-## Windows-specific changes
-- There is a replacement for the UNIX fork() API that simulates the copy-on-write behavior using a memory mapped file on 2.8. Version 3.0 is using a similar behavior but dropped the memory mapped file in favor of the system paging file.
-- In 3.0 we switch the default memory allocator from dlmalloc to jemalloc that is supposed to do a better job at managing the heap fragmentation.
-- Because Redis makes some assumptions about the values of file descriptors, we have built a virtual file descriptor mapping layer. 
+Sukuriamas Redis konteineris naudojant docker komandinę eilutę
 
-## Redis release notes
+-------
 
-There are two current active branches: 2.8 and 3.0.
+Sukuriamas Redis projektas naudojant start.spring.io
 
-- Redis on UNIX [2.8 release notes](https://raw.githubusercontent.com/antirez/redis/2.8/00-RELEASENOTES)
-- Redis on Windows [2.8 release notes](https://raw.githubusercontent.com/MSOpenTech/redis/2.8/Redis%20on%20Windows%20Release%20Notes.md)
-- Redis on UNIX [3.0 release notes](https://raw.githubusercontent.com/antirez/redis/3.0/00-RELEASENOTES)
-- Redis on Windows [3.0 release notes](https://raw.githubusercontent.com/MSOpenTech/redis/3.0/Redis%20on%20Windows%20Release%20Notes.md)
+Nurodomi dependencies - Lombok, Spring Data Reactive Redis
 
-## How to configure and deploy Redis on Windows
+-------
 
-- [Memory Configuration for 2.8](https://github.com/MSOpenTech/redis/wiki/Memory-Configuration "Memory Configuration")
-- [Memory Configuration for 3.0](https://github.com/MSOpenTech/redis/wiki/Memory-Configuration-For-Redis-3.0 "Memory Configuration")
-- [Windows Service Documentation](https://raw.githubusercontent.com/MSOpenTech/redis/3.0/Windows%20Service%20Documentation.md "Windows Service Documentation")
-- [Redis on Windows](https://raw.githubusercontent.com/MSOpenTech/redis/2.8/Redis%20on%20Windows.md "Redis on Windows")
-- [Windows Service Documentation](https://raw.githubusercontent.com/MSOpenTech/redis/2.8/Windows%20Service%20Documentation.md "Windows Service Documentation")
+Sukuriama Java klasė - Account
+Account turi šiuos fieldus - number (kuris naudojamas kaip ID), name, balance, currency (enum tipas - gali būti USD arba EUR), type (enum tipas - gali būti JURIDICAL arba PRIVATE)
 
-## How to build Redis using Visual Studio
+-------
 
-You can use the free [Visual Studio 2013 Community Edition](http://www.visualstudio.com/products/visual-studio-community-vs). Regardless which Visual Studio edition you use, make sure you have updated to Update 5, otherwise you will get a "illegal use of this type as an expression" error.
+Toliau susikuriamas objektas RedisTemplate, kuriam nurodoma @Autowired, tai reiškia, kad bus naudojami default Redis nustatymai, dirbant su duombaze.
+Tai daroma, norint įvykdyti redis transakcijas.
 
-- Open the solution file msvs\redisserver.sln in Visual Studio, select a build configuration (Debug or Release) and target (x64) then build.
+--------
 
-    This should create the following executables in the msvs\$(Target)\$(Configuration) folder:
+Taip pat sukuriau ir savo RedisConfiguration failą, kuriame nurodyti nustatymai, kurie turėtų iš esmės leisti man įvykdyti visus reikalaujamus Redis funkcionalumus,
+tačiau, jis leido tik įdėti ir paimti objektus, neleido vykdyti MULTI transakcijų, taigi, nusprendžiau naudoti Spring sukurtą RedisTemplate.
 
-    - redis-server.exe
-    - redis-benchmark.exe
-    - redis-cli.exe
-    - redis-check-dump.exe
-    - redis-check-aof.exe
+--------
 
-## Testing
+Aprašomos 2 transakcijos - MoneyTransfer, CurrencyChange
 
-To run the Redis test suite some manual work is required:
+--------
 
-- The tests assume that the binaries are in the src folder. Use mklink to create a symbolic link to the files in the msvs\x64\Debug|Release folders. You will
-  need symbolic links for src\redis-server, src\redis-benchmark, src\redis-check-aof, src\redis-check-dump, src\redis-cli, and src\redis-sentinel.
-- The tests make use of TCL. This must be installed separately.
-- To run the cluster tests against 3.0, Ruby On Windows is required.
-- To run the tests you need to have a Unix shell on your machine, or MinGW tools in your path. To execute the tests, run the following command: 
-  "tclsh8.5.exe tests/test_helper.tcl --clients N", where N is the number of parallel clients . If a Unix shell is not installed you may see the 
-  following error message: "couldn't execute "cat": no such file or directory".
-- By default the test suite launches 16 parallel tests, but 2 is the suggested number. 
-  
-## Code of Conduct
+MoneyTransfer - leidžia iš vienos banko paskyros pervesti pinigus į kitą, tuo atvėju, jei sutampa Currency (pvz. jei viena paskyroje nurodyta USD, o kitoje EUR, transakcija yra discard'inama)
+MoneyTransfer naudoja 3 kintamuosius- accountFrom, accountTo, amount
+Iš acount from atimamas amount (jei balance>=amount) ir accountTo pridedamas amount.
+Panaudojama Redis operacija WATCH(accountFrom), norint, kad ši paskyra negalėtų dalyvauti dviejuose transakcijose vienu metu
+(negaletų vienu metu pervesti dviems paskyroms visą savo balansą)
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+---------
+
+CurrencyChange - leidžia paskyrai pakeisti savo valiutą, jei bandoma keisti valitą į tą, kuria paskyra jau ir naudoja, transakcija yra discard'inama.
+CurrencyChange naudoja tik vieną kintamąji - account
+Jei account.Currency keičiamas iš USD į EUR, account.balance yra sumažinamas 4%
+Jei account.Currency keičiamas iš EUR į USD, account.balance yra padidinamas 4%
+Redis operacija WATCH() nenaudojama.
