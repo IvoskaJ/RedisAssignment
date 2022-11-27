@@ -27,7 +27,7 @@ public class MoneyTransfer implements SessionCallback<List<Object>> {
         var hashOperations = operations.opsForHash();
         var fromAccount = (Account) hashOperations.get(ACCOUNT, fromAccountId);
         var toAccount = (Account) hashOperations.get(ACCOUNT, toAccountId);
-        operations.watch(toAccountId);
+        operations.watch(fromAccountId);
         if(Objects.nonNull(fromAccount) && Objects.nonNull(toAccount) && fromAccount.getBalance() >= amount && fromAccount.getCurrency() == toAccount.getCurrency()){
             try{
                 operations.multi();
